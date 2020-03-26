@@ -35,13 +35,13 @@ export const resolvers = {
 
       return books;
     },
-    getAuthorForBook(
+    async getAuthorForBook(
       _: any,
       args: any,
       { dataSources }: { dataSources: DataSources }
     ) {
       const { bookName } = args;
-      const book = dataSources.books.getByName(bookName);
+      const book = await dataSources.books.getByName(bookName);
       const author = dataSources.authors.getByName(book.author);
       return author;
     }

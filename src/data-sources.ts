@@ -1,29 +1,23 @@
 import { DataSource, DataSourceConfig } from "apollo-datasource";
 import { RequestOptions, RESTDataSource } from "apollo-datasource-rest";
 
-import {
-  BookDto,
-  DataSourceForBook,
-  DataSourceForAuthor,
-  AuthorDto
-} from "./models";
+import { BookDto, DataSourceForBook, DataSourceForAuthor } from "./models";
 import { GqlContext } from "./context";
-
-const books: BookDto[] = [
-  { author: "moff", name: "getting started about gql" },
-  { author: "moff", name: "talking about gql" },
-  { author: "moff", name: "even more gql" }
-];
-
-const authors: AuthorDto[] = [
-  {
-    name: "moff",
-    books: ["getting started about gql", "talking about gql", "even more gql"]
-  }
-];
+import { bookDb, authorsDb } from "./database";
+import DataLoader from "dataloader";
 
 class BookDataSource extends RESTDataSource<GqlContext>
   implements DataSourceForBook {
+  private counter = 0;
+
+  private byName = new DataLoader<string, BookDto>(
+    (names: readonly string[]) => {
+      const books = names.map(name => bookDb.getByName(name));
+
+      return Promise.resolve(books);
+    }
+  );
+
   constructor() {
     super();
     this.baseURL = "http://localhost:6666/api/";
@@ -34,27 +28,29 @@ class BookDataSource extends RESTDataSource<GqlContext>
   }
 
   public getAll() {
+    console.log("BookDataSourceCounter", ++this.counter);
+
+    const books = bookDb.getAll();
     return books;
   }
 
-  private filterByAuthorName = (authorName: string) =>
-    books.filter(book => book.author === authorName);
-  private filterByName = (name: string) =>
-    books.filter(book => book.name === name);
+  public async getByName(name: string) {
+    console.log("BookDataSourceCounter", ++this.counter);
 
-  public getByName(name: string) {
-    const existingBook = this.filterByName(name);
+    const existingBook = await this.byName.load(name);
 
-    if (existingBook.length === 0) {
+    if (!existingBook) {
       throw new Error(`No book by the name ${name}`);
     }
 
-    return existingBook[0];
+    return existingBook;
   }
 
   public getByAuthor(authorName: string) {
-    const existingBook = this.filterByAuthorName(authorName);
-    if (existingBook.length === 0) {
+    console.log("BookDataSourceCounter", ++this.counter);
+
+    const existingBook = bookDb.getByAuthor(authorName);
+    if (!existingBook) {
       throw new Error(`No book by the author ${authorName}`);
     }
 
@@ -62,13 +58,9 @@ class BookDataSource extends RESTDataSource<GqlContext>
   }
 
   public add({ name, author }: BookDto) {
-    const existingBook = this.filterByName(name);
-    if (existingBook.length !== 0) {
-      throw new Error(`A book with name ${name} allready exists`);
-    }
+    console.log("BookDataSourceCounter", ++this.counter);
 
-    const book: BookDto = { author, name };
-    books.push(book);
+    const book: BookDto = bookDb.add({ author, name });
 
     return book;
   }
@@ -77,6 +69,8 @@ class BookDataSource extends RESTDataSource<GqlContext>
 class AuthorDataSource extends DataSource<GqlContext>
   implements DataSourceForAuthor {
   private context!: GqlContext;
+
+  private counter = 0;
 
   constructor() {
     super();
@@ -87,29 +81,27 @@ class AuthorDataSource extends DataSource<GqlContext>
   }
 
   public getAll() {
+    console.log("AuthorDataSourceCounter", ++this.counter);
+    const authors = authorsDb.getAll();
+
     return authors;
   }
 
   public getByName(name: string) {
-    const existingAuthors = authors.filter(author => author.name === name);
+    console.log("AuthorDataSourceCounter", ++this.counter);
 
-    if (existingAuthors.length === 0) {
+    const author = authorsDb.getByName(name);
+    if (!author) {
       throw new Error(`No author by the name ${name}`);
     }
 
-    return authors[0];
+    return author;
   }
 
   public addBook(name: string, book: string) {
-    let author = this.getByName(name);
+    console.log("AuthorDataSourceCounter", ++this.counter);
 
-    if (!author) {
-      author = { name, books: [] };
-      authors.push(author);
-    }
-
-    if (author.books.filter(bookName => bookName === book).length === 0)
-      author.books.push(book);
+    const author = authorsDb.addBook(name, book);
 
     return author;
   }

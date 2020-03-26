@@ -10,7 +10,7 @@ export interface AuthorDto {
 
 export interface DataSourceForBook {
   getAll: () => BookDto[];
-  getByName: (name: string) => BookDto;
+  getByName: (name: string) => Promise<BookDto>;
   getByAuthor: (name: string) => BookDto[];
   add: (book: BookDto) => BookDto;
 }
